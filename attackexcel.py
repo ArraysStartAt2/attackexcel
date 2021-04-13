@@ -5,6 +5,7 @@ every CSOC's favorite tool (Excel) to generate a navigator layer to help visuali
 """
 import argparse
 import json
+import sys
 
 from attackcti import attack_client
 from openpyxl import load_workbook, Workbook
@@ -192,6 +193,9 @@ def main():
     parser_layer.set_defaults(func=layer)
 
     # parse the arguments and call the function to handle the appropriate command
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
     args = parser.parse_args()
     args.func(args)
 
