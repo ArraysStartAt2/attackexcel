@@ -36,9 +36,8 @@ default_layer_template = {
 	"hideDisabled": "false",
 	"gradient": {
 		"colors": [
-			"#ff6666",
-			"#ffe766",
-			"#8ec843"
+			"#ffffff",
+			"#66b1ff",
 		],
 		"minValue": 0,
 		"maxValue": 100
@@ -65,10 +64,10 @@ def validate_platform_filters_to_domain(args):
     function does just that.
     """
     platform_filter = None
-    if args.platformfilterin is not None:
-        platform_filter = args.platformfilterin
-    if args.platformfilterout is not None:
-        platform_filter = args.platformfilterout
+    if args.platforminclude is not None:
+        platform_filter = args.platforminclude
+    if args.platformexclude is not None:
+        platform_filter = args.platformexclude
     if platform_filter is None:
         return True
     if args.domain == 'enterprise-attack':
@@ -96,24 +95,23 @@ def create_platform_filter(args):
     platform_filter = set()
     if args.domain == 'enterprise-attack':
         platform_filter = valid_enterprise_platforms
-        if args.platformfilterin is not None:
-            platform_filter = set(args.platformfilterin)
-        if args.platformfilterout is not None:
-            platform_filter = valid_enterprise_platforms.difference(set(args.platformfilterout))
+        if args.platforminclude is not None:
+            platform_filter = set(args.platforminclude)
+        if args.platformexclude is not None:
+            platform_filter = valid_enterprise_platforms.difference(set(args.platformexclude))
     elif args.domain == 'mobile-attack':
         platform_filter = valid_mobile_platforms
-        if args.platformfilterin is not None:
-            platform_filter = set(args.platformfilterin)
-        if args.platformfilterout is not None:
-            platform_filter = valid_mobile_platforms.difference(set(args.platformfilterout))
+        if args.platforminclude is not None:
+            platform_filter = set(args.platforminclude)
+        if args.platformexclude is not None:
+            platform_filter = valid_mobile_platforms.difference(set(args.platformexclude))
     elif args.domain == 'ics-attack':
         platform_filter = valid_ics_platforms
-        if args.platformfilterin is not None:
-            platform_filter = set(args.platformfilterin)
-        if args.platformfilterout is not None:
-            platform_filter = valid_ics_platforms.difference(set(args.platformfilterout))
+        if args.platforminclude is not None:
+            platform_filter = set(args.platforminclude)
+        if args.platformexclude is not None:
+            platform_filter = valid_ics_platforms.difference(set(args.platformexclude))
 
-    # We needed to start out with a set to do some set math, but now we want a list
     return platform_filter
 
 
@@ -129,15 +127,16 @@ def seed(args):
     client = attack_client()
     techniques = dict()
     if args.domain == 'enterprise-attack':
-        techniques = client.get_enterprise_techniques(stix_format=False)
+        techniques = sorted(client.get_enterprise_techniques(stix_format=False), key=lambda k: k['technique_id'])
     elif args.domain == 'mobile-attack':
-        techniques = client.get_mobile_techniques(stix_format=False)
+        techniques = sorted(client.get_mobile_techniques(stix_format=False), key=lambda k: k['technique_id'])
     elif args.domain == 'ics-attack':
-        techniques = client.get_ics_techniques(stix_format=False)
+        techniques = sorted(client.get_ics_techniques(stix_format=False), key=lambda k: k['technique_id'])
 
     # Create a new workbook and some sheets
     workbook = Workbook()
-    sheet1 = workbook.create_sheet(title='techniques')
+    sheet1 = workbook.worksheets[0]
+    sheet1.title = 'techniques'
     sheet2 = workbook.create_sheet(title='techniquesToDataSources')
     sheet3 = workbook.create_sheet(title='dataSources')
 
@@ -145,11 +144,16 @@ def seed(args):
     sheet1.cell(row=1, column=1, value='techniqueID')
     sheet1.cell(row=1, column=2, value='name')
     sheet1.cell(row=1, column=3, value='isSubtechnique')
-    sheet1.cell(row=1, column=4, value='platforms')
-    sheet1.cell(row=1, column=5, value='description')
+    sheet1.cell(row=1, column=4, value='tactics')
+    sheet1.cell(row=1, column=5, value='platforms')
+    sheet1.cell(row=1, column=6, value='score')
+    sheet1.cell(row=1, column=7, value='dataSourcesCovered')
+    sheet1.cell(row=1, column=8, value='numberOfDataSources')
+    sheet1.cell(row=1, column=9, value='description')
     sheet2.cell(row=1, column=1, value='techniqueID')
     sheet2.cell(row=1, column=2, value='dataSourceName')
     sheet3.cell(row=1, column=1, value='dataSourceName')
+    sheet3.cell(row=1, column=2, value='covered?')
 
     # Create a set to hold unique data sources
     data_sources = set()
@@ -158,10 +162,15 @@ def seed(args):
     sheet1_row = 2
     sheet2_row = 2
     platform_filter = create_platform_filter(args)
+
     for technique in techniques:
         # skip this technique if it was revoked
         if ('revoked' in technique) and (technique['revoked']):
             print(f'Skipping {technique["technique_id"]} because it was revoked.')
+            continue
+        # skip this technique if it was deprecated
+        if ('x_mitre_deprecated' in technique) and (technique['x_mitre_deprecated']):
+            print(f'Skipping {technique["technique_id"]} because it was deprecated.')
             continue
         # skip this technique if it's a subtechnique and the no-subtechniques flag is set
         if technique['x_mitre_is_subtechnique'] and not args.subtechniques:
@@ -177,21 +186,30 @@ def seed(args):
         sheet1.cell(row=sheet1_row, column=1, value=technique['technique_id'])
         sheet1.cell(row=sheet1_row, column=2, value=technique['technique'])
         sheet1.cell(row=sheet1_row, column=3, value=str(technique['x_mitre_is_subtechnique']))
-        sheet1.cell(row=sheet1_row, column=4, value=str(technique['platform']))
+        sheet1.cell(row=sheet1_row, column=4, value=', '.join(technique['tactic']))
+        sheet1.cell(row=sheet1_row, column=5, value=', '.join(technique['platform']))
+        sheet1.cell(row=sheet1_row, column=7,
+                    value='=SUMIF(techniquesToDataSources!A:A,A' + str(sheet1_row) + ',techniquesToDataSources!C:C)')
+        sheet1.cell(row=sheet1_row, column=8,
+                    value='=COUNTIF(techniquesToDataSources!A:A,A' + str(sheet1_row) + ')')
+        if 'technique_description' in technique:
+            sheet1.cell(row=sheet1_row, column=9, value=technique['technique_description'])
+
         if 'data_sources' in technique:
-            for data_source in technique['data_sources']:
+            for data_source in sorted(technique['data_sources']):
                 sheet2.cell(row=sheet2_row, column=1, value=technique['technique_id'])
                 sheet2.cell(row=sheet2_row, column=2, value=data_source)
+                sheet2.cell(row=sheet2_row, column=3,
+                            value='=VLOOKUP(B' + str(sheet2_row) + ',dataSources!A:B,2,FALSE)')
                 data_sources.add(data_source)
                 sheet2_row = sheet2_row + 1
-        if 'technique_description' in technique:
-            sheet1.cell(row=sheet1_row, column=5, value=technique['technique_description'])
         sheet1_row = sheet1_row + 1
 
     # Loop through the extracted data sources
     sheet3_row = 2
-    for data_source in data_sources:
+    for data_source in sorted(list(data_sources)):
         sheet3.cell(row=sheet3_row, column=1, value=data_source)
+        sheet3.cell(row=sheet3_row, column=2, value=0)
         sheet3_row = sheet3_row + 1
 
     workbook.save(args.outfile)
@@ -265,9 +283,9 @@ def main():
     parser_seed.add_argument('--no-subtechniques', dest='subtechniques', action='store_false')
     parser_seed.set_defaults(subtechniques=True)
     parser_seed_group_filter = parser_seed.add_mutually_exclusive_group()
-    parser_seed_group_filter.add_argument('--platformfilterout', type=str, nargs='+',
+    parser_seed_group_filter.add_argument('--platformexclude', type=str, nargs='+',
                                    choices=list(valid_enterprise_platforms))
-    parser_seed_group_filter.add_argument('--platformfilterin', type=str, nargs='+',
+    parser_seed_group_filter.add_argument('--platforminclude', type=str, nargs='+',
                                    choices=set().union(valid_enterprise_platforms,
                                                        valid_mobile_platforms,
                                                        valid_ics_platforms))
@@ -287,9 +305,9 @@ def main():
     parser_layer.add_argument('--description', type=str, default='',
                               help='a description for the layer (default=none)')
     parser_layer_group = parser_layer.add_mutually_exclusive_group()
-    parser_layer_group.add_argument('--platformfilterout', type=str, nargs='+',
+    parser_layer_group.add_argument('--platformexclude', type=str, nargs='+',
                                     choices=list(valid_enterprise_platforms))
-    parser_layer_group.add_argument('--platformfilterin', type=str, nargs='+',
+    parser_layer_group.add_argument('--platforminclude', type=str, nargs='+',
                                     choices=set().union(valid_enterprise_platforms,
                                                         valid_mobile_platforms,
                                                         valid_ics_platforms))

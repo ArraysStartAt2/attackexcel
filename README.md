@@ -7,7 +7,7 @@ A command-line tool to work with MITRE ATT&CK and Excel
 Attackexcel was born out of a necessity to create MITRE ATT&CK Heatmaps quickly and easily that
 represent a variety of things. It does this through the use of two sub-commands: *seed*, and *layer*.
 The former downloads the knowledgebase from the MITRE TAXII server into an Excel workbook and adds some
-useful columns and functions, while the latter transforms the workbook into a json file suitable for use
+useful columns, while the latter transforms the workbook into a json file suitable for use
 with the ATT&CK Navigator.
 
 This tool works with version 9 of MITRE ATT&CK, version 4.3 of the navigator, and 4.2 of the layer files.
@@ -33,9 +33,9 @@ This will download the Mobile matrix:
 
 ### Filtering
 By default, *seed* will include techniques associated with all platforms (even PRE!), but you can change this
-behavior with the platformfilterin or platformfilterout switches and a space-separated list of platforms. If using
-platformfilterin, a given technique will be included if at least one of its associated platforms is in the list. If
-using platformfilterout, a given technique will be included only if *none* of its associated platforms are in the list.
+behavior with the platforminclude or platformexclude switches and a space-separated list of platforms. If using
+platforminclude, a given technique will be included if at least one of its associated platforms is in the list. If
+using platformexclude, a given technique will be included only if *none* of its associated platforms are in the list.
 These switches are mutually exclusive. Filter values are case-sensitive, and must be one of 'SaaS', 'macOS', 'PRE',
 'IaaS', 'Linux', 'Office 365', 'Containers', 'Google Workspace', 'Windows', 'Network', 'Azure AD', 'Android', 'iOS',
 'Field Controller/RTU/PLC/IED', 'Safety Instrumented System/Protection Relay', 'Control Server', 'Input/Output Server',
@@ -44,19 +44,19 @@ contains a space. The supplied values must all be relevant to the chosen domain.
 
 This will download techniques associated with Windows, macOS, Linux, and Office 365 from the Enterprise matrix:
 
-`attackexcel seed [filename] --platformfilterin Windows macOS Linux 'Office 365'`
+`attackexcel seed [filename] --platforminclude Windows macOS Linux 'Office 365'`
 
 This will download techniques associated with all platforms except PRE from the Enterprise matrix:
 
-`attackexcel seed [filename] --platformfilterout PRE`
+`attackexcel seed [filename] --platformexclude PRE`
 
 This will download techniques associated with Control Server from the ICS matrix:
 
-`attackexcel seed [filename] --domain ics-attack --platformfilterin 'Control Server'`
+`attackexcel seed [filename] --domain ics-attack --platforminclude 'Control Server'`
 
 This will download techniques associated with Android from the Mobile matrix:
 
-`attackexcel seed [filename] --domain mobile-attack --platformfilterin 'Android'`
+`attackexcel seed [filename] --domain mobile-attack --platforminclude 'Android'`
 
 
 ### Subtechniques
@@ -93,7 +93,8 @@ If you want the Navigator to only show a certain list of platforms, you can spec
 using the same switches as *seed*. Note, however, that all the techniques will still be in the layer file and
 will be available within the Navigator. They will merely be hidden.
 
-`attackexcel layer [input filename] [output filename] --platformfilterin Windows MacOS Linux IaaS`
-`attackexcel layer [input filename] [output filename] --platformfilterout PRE`
+`attackexcel layer [input filename] [output filename] --platforminclude Windows MacOS Linux IaaS`
+`attackexcel layer [input filename] [output filename] --platformexclude PRE`
 
-
+## Sample worksheet
+Seeding a workbook is cool, but if you really want to leverage the power of Excel and ATT&CK you'll 
