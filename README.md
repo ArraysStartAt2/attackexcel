@@ -98,6 +98,7 @@ using the same switches as *seed*. Note, however, that all the techniques will s
 will be available within the Navigator. They will merely be hidden.
 
 `attackexcel layer [input filename] [output filename] --platforminclude Windows MacOS Linux IaaS`
+
 `attackexcel layer [input filename] [output filename] --platformexclude PRE`
 
 ## Sample worksheet
